@@ -1,0 +1,3 @@
+const RPC_URL = "";
+
+module.exports = RPC_URL;

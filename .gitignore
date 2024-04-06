@@ -7,3 +7,6 @@ cache
 .vscode
 artifacts
 cache
+
+test/puppet-v3/rpcUrl.js
+
