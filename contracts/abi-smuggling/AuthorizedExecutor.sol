@@ -30,7 +30,7 @@ abstract contract AuthorizedExecutor is ReentrancyGuard {
             revert AlreadyInitialized();
         }
 
-        for (uint256 i = 0; i < ids.length;) {
+        for (uint256 i = 0; i < ids.length; ) {
             unchecked {
                 permissions[ids[i]] = true;
                 ++i;
@@ -46,7 +46,10 @@ abstract contract AuthorizedExecutor is ReentrancyGuard {
      * @param target account where the action will be executed
      * @param actionData abi-encoded calldata to execute on the target
      */
-    function execute(address target, bytes calldata actionData) external nonReentrant returns (bytes memory) {
+    function execute(
+        address target,
+        bytes calldata actionData
+    ) external nonReentrant returns (bytes memory) {
         // Read the 4-bytes selector at the beginning of `actionData`
         bytes4 selector;
         uint256 calldataOffset = 4 + 32 * 3; // calldata position where `actionData` begins
@@ -63,9 +66,16 @@ abstract contract AuthorizedExecutor is ReentrancyGuard {
         return target.functionCall(actionData);
     }
 
-    function _beforeFunctionCall(address target, bytes memory actionData) internal virtual;
+    function _beforeFunctionCall(
+        address target,
+        bytes memory actionData
+    ) internal virtual;
 
-    function getActionId(bytes4 selector, address executor, address target) public pure returns (bytes32) {
+    function getActionId(
+        bytes4 selector,
+        address executor,
+        address target
+    ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(selector, executor, target));
     }
 }
